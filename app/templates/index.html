@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Air Compressor Management</title>
+  <meta name="description" content="Industrial IoT air compressor OEE monitoring, Siemens S7-1200 telemetry, and local AI health diagnostics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/plc.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header" id="appHeader">
+    <div class="header-left">
+      <div class="logo-group">
+        <div class="logo-icon-wrap">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+          </svg>
+          <span class="live-pulse"></span>
+        </div>
+        <div>
+          <h1 class="app-title">Air Compressor Management</h1>
+          <span class="app-subtitle">OEE & Diagnostics SCADA</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tab-group" aria-label="Main Navigation">
+        <a href="/" class="nav-tab active">📊 Overview Cockpit</a>
+        <a href="/plc" class="nav-tab">🔌 PLC Diagnostics</a>
+      </nav>
+
+      <div class="machine-tag-badge" id="machineTagBadge">
+        <span class="tag-id">CMP-01</span>
+        <span class="tag-model">GA-75 VSD (75 kW)</span>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="state-indicator" id="stateIndicator">
+        <span class="state-dot" id="stateDot"></span>
+        <span class="state-text" id="stateText">CONNECTING...</span>
+      </div>
+      <div class="source-badge" id="dbDialectBadge">
+        <span class="badge-label">DB:</span>
+        <span class="badge-value" id="dbDialectText">MSSQL</span>
+      </div>
+      <div class="source-badge" id="plcSourceBadge">
+        <span class="badge-label">PLC:</span>
+        <span class="badge-value" id="plcSourceText">S7-1200 SIM</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Simulator Anomaly Tester Dropdown -->
+      <div class="anomaly-control-group">
+        <label for="anomalySelect" class="sr-only">Simulator Injection</label>
+        <select id="anomalySelect" class="anomaly-select" title="Test real-world compressor fault conditions">
+          <option value="reset">Normal Auto Cycle</option>
+          <option value="high_temp">Inject Overheat (101.5°C)</option>
+          <option value="separator_clog">Inject Clogged Separator (0.95 bar)</option>
+          <option value="trip">Simulate Emergency Trip</option>
+        </select>
+        <button id="btnInjectAnomaly" class="btn-anomaly-action" title="Apply simulated condition">Inject</button>
+      </div>
+
+      <!-- AI Assistant Toggle Button -->
+      <button id="btnToggleChat" class="btn-chat-toggle" aria-label="Toggle AI Diagnostics Chatbot">
+        <svg class="chat-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>AI Diagnostics</span>
+        <span class="ai-sparkle">✦</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Cockpit Container -->
+  <main class="cockpit-container">
+    
+    <!-- Row 1: KPI Radial Gauges & Live Metric Cards -->
+    <section class="kpi-grid" aria-label="Key Performance Indicators">
+      
+      <!-- Overall OEE Card -->
+      <div class="card kpi-card oee-card" id="cardOEE">
+        <div class="card-header">
+          <span class="card-title">Overall OEE</span>
+          <span class="badge-time">24h Shift</span>
+        </div>
+        <div class="oee-gauge-container">
+          <div class="radial-progress" id="oeeRadialProgress">
+            <svg class="radial-svg" viewBox="0 0 120 120">
+              <circle class="radial-bg" cx="60" cy="60" r="50"></circle>
+              <circle class="radial-fill" id="oeeRadialFill" cx="60" cy="60" r="50"></circle>
+            </svg>
+            <div class="radial-label-box">
+              <span class="radial-value" id="valOEE">--%</span>
+              <span class="radial-sub">Target: 85%</span>
+            </div>
+          </div>
+          <div class="oee-pillars-breakdown">
+            <div class="pillar-row">
+              <span class="pillar-label">Availability</span>
+              <div class="pillar-bar-wrap">
+                <div class="pillar-bar-fill avail" id="barAvail" style="width: 0%;"></div>
+              </div>
+              <span class="pillar-num" id="valAvail">--%</span>
+            </div>
+            <div class="pillar-row">
+              <span class="pillar-label">Performance</span>
+              <div class="pillar-bar-wrap">
+                <div class="pillar-bar-fill perf" id="barPerf" style="width: 0%;"></div>
+              </div>
+              <span class="pillar-num" id="valPerf">--%</span>
+            </div>
+            <div class="pillar-row">
+              <span class="pillar-label">Quality</span>
+              <div class="pillar-bar-wrap">
+                <div class="pillar-bar-fill qual" id="barQual" style="width: 0%;"></div>
+              </div>
+              <span class="pillar-num" id="valQual">--%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Discharge & Header Pressure -->
+      <div class="card kpi-card" id="cardPressure">
+        <div class="card-header">
+          <span class="card-title">Discharge Pressure</span>
+          <span class="unit-pill">bar</span>
+        </div>
+        <div class="kpi-main-metric">
+          <span class="kpi-hero-num" id="valDischargePressure">--</span>
+          <span class="kpi-sub-metric">Header: <strong id="valHeaderPressure">--</strong> bar</span>
+        </div>
+        <div class="bar-range-meter">
+          <div class="bar-range-track">
+            <div class="bar-range-band" style="left: 65%; width: 10%;" title="Target Band 6.5 - 7.5 bar"></div>
+            <div class="bar-range-needle" id="needlePressure" style="left: 70%;"></div>
+          </div>
+          <div class="range-scale">
+            <span>0</span>
+            <span class="target-mark">Target: 6.5 - 7.5 bar</span>
+            <span>10</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Airend Temperature -->
+      <div class="card kpi-card" id="cardTemperature">
+        <div class="card-header">
+          <span class="card-title">Airend Element Temp</span>
+          <span class="unit-pill">°C</span>
+        </div>
+        <div class="kpi-main-metric">
+          <span class="kpi-hero-num" id="valAirendTemp">--</span>
+          <span class="kpi-sub-metric">Oil Sump: <strong id="valOilTemp">--</strong> °C</span>
+        </div>
+        <div class="bar-range-meter">
+          <div class="bar-range-track temp-track">
+            <div class="bar-range-needle temp-needle" id="needleTemp" style="left: 75%;"></div>
+          </div>
+          <div class="range-scale">
+            <span>40°C</span>
+            <span class="warn-mark">Warn: 98°C</span>
+            <span class="trip-mark">Trip: 105°C</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Power & Load Current -->
+      <div class="card kpi-card" id="cardPower">
+        <div class="card-header">
+          <span class="card-title">Active Power & Current</span>
+          <span class="unit-pill">kW</span>
+        </div>
+        <div class="kpi-main-metric">
+          <span class="kpi-hero-num" id="valActivePower">--</span>
+          <span class="kpi-sub-metric">Current: <strong id="valCurrent">--</strong> A (PF: <span id="valPF">--</span>)</span>
+        </div>
+        <div class="flow-energy-stats">
+          <div class="mini-stat">
+            <span class="mini-stat-label">Air Flow</span>
+            <span class="mini-stat-val" id="valAirFlow">-- CFM</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-label">Dew Point</span>
+            <span class="mini-stat-val" id="valDewPoint">-- °C</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Separator Differential Pressure & SEC -->
+      <div class="card kpi-card" id="cardSeparator">
+        <div class="card-header">
+          <span class="card-title">Air-Oil Separator ΔP</span>
+          <span class="unit-pill">bar</span>
+        </div>
+        <div class="kpi-main-metric">
+          <span class="kpi-hero-num" id="valSeparatorDP">--</span>
+          <span class="kpi-sub-metric">Air Filter ΔP: <strong id="valAirFilterDP">--</strong> mbar</span>
+        </div>
+        <div class="sec-stat-box">
+          <div class="sec-label-group">
+            <span class="sec-title">Specific Energy Consumption (SEC)</span>
+            <span class="sec-tag" id="valSECStatus">OPTIMAL</span>
+          </div>
+          <div class="sec-number-row">
+            <span class="sec-num" id="valSEC">0.112</span>
+            <span class="sec-unit">kWh / m³</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Row 2: Live Strip Chart Waveform & Pneumatic Schematic -->
+    <section class="dashboard-main-grid">
+      
+      <!-- Left: Real-time 60-second Strip Chart -->
+      <div class="card chart-card" id="cardLiveTrend">
+        <div class="card-header">
+          <div class="chart-header-left">
+            <h2 class="card-title">Live Dynamic Strip-Chart</h2>
+            <span class="live-tag">● Real-time Telemetry (60s Window)</span>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color p-color"></span> Discharge Pressure (bar)</span>
+            <span class="legend-item"><span class="legend-color kw-color"></span> Active Power (kW)</span>
+          </div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="liveStripCanvas" width="800" height="260"></canvas>
+        </div>
+      </div>
+
+      <!-- Right: Animated Compressor Physical Circuit -->
+      <div class="card schematic-card" id="cardSchematic">
+        <div class="card-header">
+          <h2 class="card-title">Compressor Digital Twin Circuit</h2>
+          <span class="cycle-pill" id="cyclePill">LOADED</span>
+        </div>
+        <div class="schematic-view">
+          <div class="circuit-diagram">
+            <!-- Suction Intake -->
+            <div class="circuit-node node-intake" id="nodeIntake">
+              <div class="node-icon">📥</div>
+              <span class="node-label">Air Intake</span>
+              <span class="node-telemetry" id="nodeAirFilterDP">ΔP 18 mbar</span>
+            </div>
+            <div class="flow-arrow" id="flowArrow1">➔</div>
+
+            <!-- Screw Airend -->
+            <div class="circuit-node node-airend" id="nodeAirend">
+              <div class="node-icon rotating-element">⚙️</div>
+              <span class="node-label">Screw Airend</span>
+              <span class="node-telemetry" id="nodeAirendTemp">88.5°C</span>
+            </div>
+            <div class="flow-arrow" id="flowArrow2">➔</div>
+
+            <!-- Air-Oil Separator -->
+            <div class="circuit-node node-separator" id="nodeSeparator">
+              <div class="node-icon">🛢️</div>
+              <span class="node-label">Separator Vessel</span>
+              <span class="node-telemetry" id="nodeSeparatorDP">ΔP 0.28 bar</span>
+            </div>
+            <div class="flow-arrow" id="flowArrow3">➔</div>
+
+            <!-- Discharge / Header -->
+            <div class="circuit-node node-discharge" id="nodeDischarge">
+              <div class="node-icon">💨</div>
+              <span class="node-label">Plant Header</span>
+              <span class="node-telemetry" id="nodeDischargeP">7.2 bar</span>
+            </div>
+          </div>
+
+          <div class="operating-hours-bar">
+            <div class="hour-stat">
+              <span class="hour-label">Total Running Hours:</span>
+              <strong id="valRunHours">4,320.5 h</strong>
+            </div>
+            <div class="hour-stat">
+              <span class="hour-label">Loaded Hours:</span>
+              <strong id="valLoadedHours">3,380.2 h</strong>
+            </div>
+            <div class="hour-stat">
+              <span class="hour-label">Duty Ratio:</span>
+              <strong id="valDutyRatio">78.2%</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Row 3: 24-Hour OEE Timeline & Alarm Event Log -->
+    <section class="dashboard-bottom-grid">
+      
+      <!-- 24-Hour Hourly OEE Bar Chart -->
+      <div class="card timeline-card" id="cardHourlyOEE">
+        <div class="card-header">
+          <h2 class="card-title">24-Hour OEE & Energy Profile</h2>
+          <span class="badge-time">Past 24 Hours Breakdown</span>
+        </div>
+        <div class="canvas-container">
+          <canvas id="hourlyOeeCanvas" width="700" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Real-Time Alarms & Event Log -->
+      <div class="card events-card" id="cardEvents">
+        <div class="card-header">
+          <h2 class="card-title">System Event & Alarm Feed</h2>
+          <span class="events-count" id="eventsCount">3 Events</span>
+        </div>
+        <div class="events-table-wrap">
+          <table class="events-table" id="eventsTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Severity</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="eventsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Slide-out AI Diagnostics Chatbot Drawer -->
+  <aside class="chat-drawer" id="chatDrawer" aria-label="AI Diagnostics Drawer">
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <div class="bot-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="10" rx="2"/>
+            <circle cx="12" cy="5" r="2"/>
+            <path d="M12 7v4m-4 5h.01m8 0h.01"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="bot-name">Compressor Diagnostic AI</h2>
+          <span class="bot-status" id="botStatus">
+            <span class="bot-dot"></span> <span id="botStatusText">Checking Ollama...</span>
+          </span>
+        </div>
+      </div>
+      <button class="btn-close-chat" id="btnCloseChat" aria-label="Close Chat">&times;</button>
+    </div>
+
+    <!-- Suggested Quick Action Prompt Chips -->
+    <div class="chat-suggestions-container" id="chatSuggestions">
+      <div class="suggestions-scroll" id="suggestionsScroll">
+        <!-- Dynamically injected prompt chips -->
+      </div>
+    </div>
+
+    <!-- Chat Messages Scrollable Window -->
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-bubble bot-message welcome-bubble">
+        <div class="bubble-header">
+          <strong>Compressor Diagnostic Agent</strong>
+          <span class="msg-time">Just now</span>
+        </div>
+        <div class="bubble-content">
+          <p>Hello! I am your local <strong>Air Compressor Diagnostic Intelligence</strong>.</p>
+          <p>I continuously evaluate your telemetry from MS SQL Server to spot OEE bottlenecks, idle power waste, thermal drift, and filter degradation.</p>
+          <p>Click any prompt chip above or type your question below!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Input Area -->
+    <div class="chat-input-area">
+      <form id="chatForm" class="chat-form">
+        <input 
+          type="text" 
+          id="chatInput" 
+          class="chat-input" 
+          placeholder="Ask about OEE, temperatures, alarms, or efficiency..." 
+          autocomplete="off"
+          required
+        >
+        <button type="submit" id="btnSendChat" class="btn-send" aria-label="Send query">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Script Modules -->
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>

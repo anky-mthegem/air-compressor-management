@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PLC Communication & Diagnostics | Air Compressor Management</title>
+  <meta name="description" content="Siemens S7-1200 PLC data point exchange, watchdog handshaking, and connection fault diagnostics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/plc.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header" id="appHeader">
+    <div class="header-left">
+      <div class="logo-group">
+        <div class="logo-icon-wrap">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+          <span class="live-pulse" id="headerLivePulse"></span>
+        </div>
+        <div>
+          <h1 class="app-title">Air Compressor Management</h1>
+          <span class="app-subtitle">Siemens S7-1200 Field Communication</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tab-group" aria-label="Main Navigation">
+        <a href="/" class="nav-tab">📊 Overview Cockpit</a>
+        <a href="/plc" class="nav-tab active">🔌 PLC Diagnostics</a>
+      </nav>
+    </div>
+
+    <div class="header-center">
+      <div class="state-indicator" id="plcStateIndicator">
+        <span class="state-dot" id="plcStateDot"></span>
+        <span class="state-text" id="plcStateText">CHECKING LINK...</span>
+      </div>
+      <div class="source-badge">
+        <span class="badge-label">PLC IP:</span>
+        <span class="badge-value" id="hdrPlcIp">{{ plc_ip }}</span>
+      </div>
+      <div class="source-badge">
+        <span class="badge-label">Data Block:</span>
+        <span class="badge-value">DB{{ plc_db }}</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button id="btnToggleChat" class="btn-chat-toggle" aria-label="Toggle AI Diagnostics Chatbot">
+        <svg class="chat-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>AI Diagnostics</span>
+        <span class="ai-sparkle">✦</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="cockpit-container plc-container">
+    
+    <!-- Row 1: Connection Health Banner & Quick Actions -->
+    <section class="card plc-banner-card" id="cardPlcBanner">
+      <div class="banner-left">
+        <div class="banner-status-badge connected" id="bannerBadge">
+          <span class="banner-dot"></span>
+          <div class="banner-status-info">
+            <span class="banner-status-title" id="bannerStatusTitle">PLC LINK CONNECTED</span>
+            <span class="banner-status-sub" id="bannerStatusSub">ISO-on-TCP (Port 102) Active Communication</span>
+          </div>
+        </div>
+
+        <div class="plc-network-stats">
+          <div class="stat-pill">
+            <span class="stat-lbl">Latency:</span>
+            <strong class="stat-val" id="valLatency">-- ms</strong>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-lbl">Packets:</span>
+            <strong class="stat-val" id="valPackets">-- / --</strong>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-lbl">Loss:</span>
+            <strong class="stat-val" id="valLoss">0.0%</strong>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-lbl">Last Poll:</span>
+            <strong class="stat-val" id="valLastPoll">-- s ago</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="banner-actions">
+        <button id="btnProbeSocket" class="btn-action-outline" title="Test Port 102 ISO-on-TCP connectivity">
+          🔍 Probe Socket (Port 102)
+        </button>
+        <button id="btnReconnect" class="btn-action-outline" title="Trigger full S7 driver reconnection">
+          🔄 Reconnect Driver
+        </button>
+        <button id="btnSimulateDisconnect" class="btn-action-danger" title="Simulate cable cut or network drop">
+          ⚡ Simulate Disconnect
+        </button>
+      </div>
+    </section>
+
+    <!-- Row 2: Watchdog Handshake & Real-Time EKG Monitor -->
+    <section class="handshake-grid">
+      
+      <!-- Live Heartbeat Waveform Card -->
+      <div class="card handshake-card" id="cardHeartbeatWave">
+        <div class="card-header">
+          <div class="header-with-pulse">
+            <h2 class="card-title">Watchdog Heartbeat Monitor</h2>
+            <span class="heartbeat-live-pill">● ACTIVE CYCLIC HANDSHAKE</span>
+          </div>
+          <div class="counter-chips">
+            <span class="counter-chip">PLC (DBW70): <strong id="valPlcCounter">--</strong></span>
+            <span class="counter-chip">Echo (DBW72): <strong id="valEchoCounter">--</strong></span>
+          </div>
+        </div>
+        <div class="canvas-container heartbeat-canvas-wrap">
+          <canvas id="heartbeatCanvas" width="700" height="150"></canvas>
+        </div>
+        <div class="watchdog-timer-bar">
+          <div class="watchdog-timer-fill" id="watchdogTimerFill" style="width: 100%;"></div>
+        </div>
+        <div class="watchdog-scale">
+          <span>0s (Fresh Poll)</span>
+          <span id="lblTimeoutThreshold">Watchdog Limit: 5.0s</span>
+        </div>
+      </div>
+
+      <!-- Handshaking Settings Card -->
+      <div class="card handshake-settings-card" id="cardHandshakeSettings">
+        <div class="card-header">
+          <h2 class="card-title">Handshake Configuration</h2>
+          <span class="unit-pill">ISO 13849 Safety</span>
+        </div>
+        <form id="handshakeForm" class="handshake-form">
+          <div class="form-row toggle-row">
+            <label for="chkHandshakeEnabled" class="form-label">
+              <strong>Enable Cyclic Watchdog Handshake</strong>
+              <span class="form-desc">Continuously verifies CPU execution state via echo counter</span>
+            </label>
+            <input type="checkbox" id="chkHandshakeEnabled" class="toggle-checkbox" checked>
+          </div>
+
+          <div class="form-row">
+            <div class="slider-header">
+              <label for="rngWatchdogTimeout" class="form-label">Watchdog Loss Timeout</label>
+              <span class="slider-val" id="valWatchdogTimeoutDisplay">5.0 seconds</span>
+            </div>
+            <input type="range" id="rngWatchdogTimeout" class="slider-control" min="1" max="20" step="0.5" value="5.0">
+            <span class="form-desc">If no counter change is received within this time, communication alarm trips.</span>
+          </div>
+
+          <button type="submit" id="btnSaveHandshake" class="btn-save-settings">Save Handshake Parameters</button>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- Row 3: Full Data Point Exchange Table -->
+    <section class="card datapoints-card" id="cardDataPoints">
+      <div class="card-header">
+        <div class="table-header-left">
+          <h2 class="card-title">S7-1200 Data Block Register Exchange</h2>
+          <span class="unit-pill" id="datapointsCount">24 Points Mapped</span>
+        </div>
+        <div class="table-tools">
+          <input 
+            type="text" 
+            id="searchDataPoints" 
+            class="table-search-input" 
+            placeholder="Search by address (e.g. DBD12) or tag..."
+          >
+        </div>
+      </div>
+
+      <div class="datapoints-table-wrap">
+        <table class="datapoints-table" id="datapointsTable">
+          <thead>
+            <tr>
+              <th>DB Offset</th>
+              <th>Parameter / Tag Name</th>
+              <th>Data Type</th>
+              <th>Direction</th>
+              <th>Live Value</th>
+              <th>Unit</th>
+              <th>Quality</th>
+            </tr>
+          </thead>
+          <tbody id="datapointsTableBody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Row 4: Diagnostics Log & TIA Portal Guide -->
+    <section class="diagnostics-guide-grid">
+      
+      <!-- Diagnostic Event Terminal -->
+      <div class="card terminal-card" id="cardTerminal">
+        <div class="card-header">
+          <h2 class="card-title">Live PLC Diagnostic Log</h2>
+          <button id="btnClearLog" class="btn-clear-terminal">Clear</button>
+        </div>
+        <div class="terminal-body" id="terminalLog">
+          <div class="terminal-line info">[SYS] PLC Driver initialized. Polling rate: 2.0s.</div>
+          <div class="terminal-line success">[COMM] S7comm handshake established with 192.168.0.1. Rack: 0, Slot: 1.</div>
+          <div class="terminal-line success">[DB1] Reading block DB1 (76 bytes)... 24 registers parsed with Quality=GOOD.</div>
+        </div>
+      </div>
+
+      <!-- TIA Portal Engineering Reference -->
+      <div class="card tia-guide-card" id="cardTiaGuide">
+        <div class="card-header">
+          <h2 class="card-title">Siemens TIA Portal Setup Checklist</h2>
+          <span class="unit-pill">Required CPU Settings</span>
+        </div>
+        <ul class="tia-checklist">
+          <li>
+            <div class="chk-item">
+              <span class="chk-icon">✓</span>
+              <div>
+                <strong>Permit PUT/GET Access in CPU Protection</strong>
+                <p>In CPU Properties -> Protection & Security -> Connection mechanisms -> check <em>"Permit access with PUT/GET communication from remote partner"</em>.</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="chk-item">
+              <span class="chk-icon">✓</span>
+              <div>
+                <strong>Turn OFF Optimized Block Access for DB1</strong>
+                <p>Right-click <strong>DB1</strong> -> Properties -> Attributes -> uncheck <em>"Optimized block access"</em> so offsets (`DBX0.0`, `DBD4`) are standard.</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="chk-item">
+              <span class="chk-icon">✓</span>
+              <div>
+                <strong>Implement PLC Heartbeat Logic</strong>
+                <p>In Main OB1, increment `DB1.DBW70` every 500ms using a clock memory byte or cyclic timer.</p>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Slide-out AI Diagnostics Chatbot Drawer -->
+  <aside class="chat-drawer" id="chatDrawer" aria-label="AI Diagnostics Drawer">
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <div class="bot-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="10" rx="2"/>
+            <circle cx="12" cy="5" r="2"/>
+            <path d="M12 7v4m-4 5h.01m8 0h.01"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="bot-name">Compressor Diagnostic AI</h2>
+          <span class="bot-status" id="botStatus">
+            <span class="bot-dot"></span> <span id="botStatusText">Checking Ollama...</span>
+          </span>
+        </div>
+      </div>
+      <button class="btn-close-chat" id="btnCloseChat" aria-label="Close Chat">&times;</button>
+    </div>
+
+    <!-- Suggested Quick Action Prompt Chips -->
+    <div class="chat-suggestions-container" id="chatSuggestions">
+      <div class="suggestions-scroll" id="suggestionsScroll">
+        <!-- Dynamically injected prompt chips -->
+      </div>
+    </div>
+
+    <!-- Chat Messages Scrollable Window -->
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-bubble bot-message welcome-bubble">
+        <div class="bubble-header">
+          <strong>Compressor Diagnostic Agent</strong>
+          <span class="msg-time">Just now</span>
+        </div>
+        <div class="bubble-content">
+          <p>PLC Communication Diagnostics Mode Active.</p>
+          <p>I can help diagnose connection timeouts, watchdog heartbeat failures, register offset mismatches, and S7-1200 communication settings.</p>
+          <p>Ask a question or click a suggested prompt chip above!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Input Area -->
+    <div class="chat-input-area">
+      <form id="chatForm" class="chat-form">
+        <input 
+          type="text" 
+          id="chatInput" 
+          class="chat-input" 
+          placeholder="Ask about PLC communication, watchdog errors, or data points..." 
+          autocomplete="off"
+          required
+        >
+        <button type="submit" id="btnSendChat" class="btn-send" aria-label="Send query">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Script Modules -->
+  <script src="/static/js/plc.js"></script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>
