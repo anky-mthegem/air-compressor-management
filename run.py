@@ -18,7 +18,7 @@ from app.config import settings
 from app.database.connection import init_db, ACTIVE_DB_DIALECT
 from app.plc.collector import plc_collector
 from app.api.websocket import start_ws_broadcast
-from app.api import api_router, chat_router, ws_router, plc_router
+from app.api import api_router, chat_router, ws_router, plc_router, data_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +72,7 @@ app.include_router(api_router)
 app.include_router(chat_router)
 app.include_router(ws_router)
 app.include_router(plc_router)
+app.include_router(data_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard(request: Request):
@@ -102,6 +103,21 @@ async def serve_plc_page(request: Request):
             "plc_ip": settings.PLC_IP,
             "plc_db": settings.PLC_DB_NUMBER,
             "current_page": "plc"
+        }
+    )
+
+@app.get("/data", response_class=HTMLResponse)
+async def serve_data_viewer(request: Request):
+    """Serves the SQL Database Log Viewer & Historian page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="data_viewer.html",
+        context={
+            "app_name": settings.APP_NAME,
+            "compressor_tag": settings.COMPRESSOR_TAG,
+            "compressor_name": settings.COMPRESSOR_NAME,
+            "active_db": ACTIVE_DB_DIALECT,
+            "current_page": "data"
         }
     )
 

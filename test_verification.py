@@ -141,6 +141,72 @@ async def run_tests():
         assert "port_102_open" in probe
         print(f" POST /api/plc/probe -> 200 OK ({probe['diagnostic_message']})")
 
+        # 6. Test SQL Database Viewer UI & Endpoints
+        print("\n[TEST 6] Testing SQL Database Viewer Endpoints...")
+        # Data Viewer HTML page
+        resp = await client.get("/data")
+        assert resp.status_code == 200
+        assert "SQL Database Historian" in resp.text
+        assert "scadaDataTable" in resp.text
+        print(" GET /data -> 200 OK (SQL Database Viewer UI served)")
+
+        # Database Overview API
+        resp = await client.get("/api/data/overview")
+        assert resp.status_code == 200
+        overview = resp.json()
+        assert "tables" in overview
+        assert overview["total_rows"] > 0
+        assert overview["tables"]["telemetry"]["row_count"] > 0
+        assert overview["tables"]["events"]["row_count"] > 0
+        assert overview["tables"]["oee"]["row_count"] > 0
+        assert overview["tables"]["master"]["row_count"] > 0
+        print(f" GET /api/data/overview -> 200 OK (Dialect: {overview['active_db']}, Total Rows: {overview['total_rows']})")
+
+        # Table Schemas API
+        resp = await client.get("/api/data/tables")
+        assert resp.status_code == 200
+        schemas = resp.json()
+        assert "telemetry" in schemas
+        assert len(schemas["telemetry"]["columns"]) >= 20
+        print(f" GET /api/data/tables -> 200 OK (Schemas verified for {list(schemas.keys())})")
+
+        # Table Records Query API (Telemetry)
+        resp = await client.get("/api/data/records?table=telemetry&limit=15&page=1")
+        assert resp.status_code == 200
+        records = resp.json()
+        assert records["table"] == "telemetry"
+        assert len(records["rows"]) <= 15
+        assert "discharge_pressure_bar" in records["columns"]
+        assert "avg_discharge_pressure_bar" in records["metrics"]
+        print(f" GET /api/data/records (telemetry) -> 200 OK ({len(records['rows'])} rows returned, Avg P: {records['metrics']['avg_discharge_pressure_bar']} bar)")
+
+        # Table Records Query API (Events)
+        resp = await client.get("/api/data/records?table=events&limit=10")
+        assert resp.status_code == 200
+        ev_records = resp.json()
+        assert ev_records["table"] == "events"
+        assert len(ev_records["rows"]) > 0
+        assert "critical_events" in ev_records["metrics"]
+        print(f" GET /api/data/records (events) -> 200 OK ({len(ev_records['rows'])} event logs, Total: {ev_records['total_records']})")
+
+        # Table Records Query API (OEE Hourly)
+        resp = await client.get("/api/data/records?table=oee&limit=10")
+        assert resp.status_code == 200
+        oee_records = resp.json()
+        assert oee_records["table"] == "oee"
+        assert len(oee_records["rows"]) > 0
+        assert "avg_oee_pct" in oee_records["metrics"]
+        print(f" GET /api/data/records (oee) -> 200 OK (Avg OEE: {oee_records['metrics']['avg_oee_pct']}%)")
+
+        # Table CSV Export API
+        resp = await client.get("/api/data/export/csv?table=telemetry&max_records=50")
+        assert resp.status_code == 200
+        assert "text/csv" in resp.headers.get("content-type", "")
+        csv_lines = resp.text.strip().split("\r\n" if "\r\n" in resp.text else "\n")
+        assert len(csv_lines) > 1, "CSV empty or missing header!"
+        assert "discharge_pressure_bar" in csv_lines[0]
+        print(f" GET /api/data/export/csv (telemetry) -> 200 OK ({len(csv_lines)} CSV lines generated)")
+
     print("\n==================================================")
     print(" ALL VERIFICATION SUITES PASSED FLAWLESSLY! ")
     print("==================================================")

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Database Logs - {{ app_name }}</title>
+  <meta name="description" content="SQL Database Historian and Telemetry Log Viewer for Air Compressor Management.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/data_viewer.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header" id="appHeader">
+    <div class="header-left">
+      <div class="logo-group">
+        <div class="logo-icon-wrap">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+          </svg>
+          <span class="live-pulse"></span>
+        </div>
+        <div>
+          <h1 class="app-title">{{ app_name }}</h1>
+          <span class="app-subtitle">SQL Database Historian & Log Viewer</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tab-group" aria-label="Main Navigation">
+        <a href="/" class="nav-tab">📊 Overview Cockpit</a>
+        <a href="/plc" class="nav-tab">🔌 PLC Diagnostics</a>
+        <a href="/data" class="nav-tab active">🗄️ SQL Data Logs</a>
+      </nav>
+
+      <div class="machine-tag-badge">
+        <span class="tag-id">{{ compressor_tag }}</span>
+        <span class="tag-model">{{ compressor_name }}</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="source-badge">
+        <span class="badge-label">Active Database:</span>
+        <span class="badge-value" style="color: var(--accent-cyan);">{{ active_db }}</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Body -->
+  <main class="data-viewer-page">
+    
+    <!-- 1. Header Strip with Status Meta -->
+    <section class="viewer-header-strip">
+      <div class="viewer-title-group">
+        <div class="viewer-icon-badge">🗄️</div>
+        <div>
+          <h2 class="viewer-heading">SQL Telemetry & Event Historian</h2>
+          <p class="viewer-subheading">Inspect, filter, and export high-frequency time-series and diagnostic records</p>
+        </div>
+      </div>
+
+      <div class="viewer-header-meta">
+        <div class="db-pill {% if active_db == 'SQLite' %}sqlite{% endif %}">
+          <span class="db-dot" id="viewerDbDot"></span>
+          <span id="viewerDbDialect">{{ active_db }}</span>
+          <span style="color: var(--text-muted);">|</span>
+          <span id="viewerTotalRows" style="color: var(--text-secondary);">Loading records...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Dynamic KPI Summary Cards -->
+    <section class="kpi-summary-grid" id="kpiSummaryGrid">
+      <div class="kpi-card">
+        <span class="kpi-label">Logged Records</span>
+        <div class="kpi-value">-</div>
+        <span class="kpi-subtext">Fetching stats...</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Primary Metric</span>
+        <div class="kpi-value">-</div>
+        <span class="kpi-subtext">Averaging samples...</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Secondary Metric</span>
+        <div class="kpi-value">-</div>
+        <span class="kpi-subtext">Calculating load...</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Health Status</span>
+        <div class="kpi-value">-</div>
+        <span class="kpi-subtext">Evaluating thresholds...</span>
+      </div>
+    </section>
+
+    <!-- 3. Table Navigation Switcher Tabs -->
+    <section class="table-switcher-bar" role="tablist" aria-label="SQL Table Selector">
+      <button class="table-tab-btn active" data-table="telemetry" role="tab" aria-selected="true">
+        <span>📈</span> Compressor Telemetry
+        <span class="table-count-badge">-</span>
+      </button>
+      <button class="table-tab-btn" data-table="events" role="tab" aria-selected="false">
+        <span>⚠️</span> Events & Alarms Log
+        <span class="table-count-badge">-</span>
+      </button>
+      <button class="table-tab-btn" data-table="oee" role="tab" aria-selected="false">
+        <span>⏱️</span> Hourly OEE Summary
+        <span class="table-count-badge">-</span>
+      </button>
+      <button class="table-tab-btn" data-table="master" role="tab" aria-selected="false">
+        <span>⚙️</span> Machine Master Config
+        <span class="table-count-badge">-</span>
+      </button>
+    </section>
+
+    <!-- 4. Filter & Action Toolbar -->
+    <section class="viewer-filter-toolbar">
+      <div class="filter-left-group">
+        <!-- Time Presets -->
+        <div class="time-pill-group" aria-label="Time Window Range">
+          <button class="time-pill-btn active" data-time="all">All Time</button>
+          <button class="time-pill-btn" data-time="1h">1h</button>
+          <button class="time-pill-btn" data-time="6h">6h</button>
+          <button class="time-pill-btn" data-time="24h">24h</button>
+          <button class="time-pill-btn" data-time="7d">7d</button>
+        </div>
+
+        <!-- Contextual Filter (Severity / State) -->
+        <label id="contextFilterLabel" for="contextFilterSelect" style="font-size: 0.8rem; color: var(--text-secondary); display: none;">Filter:</label>
+        <select id="contextFilterSelect" class="filter-select" style="display: none;">
+          <option value="ALL">All</option>
+        </select>
+
+        <!-- Search Input -->
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="tableSearchInput" class="search-input" placeholder="Search records...">
+        </div>
+      </div>
+
+      <div class="filter-right-group">
+        <!-- Page Size -->
+        <label for="pageSizeSelect" style="font-size: 0.8rem; color: var(--text-secondary);">Rows:</label>
+        <select id="pageSizeSelect" class="filter-select">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+        </select>
+
+        <!-- Auto Refresh -->
+        <div class="auto-refresh-wrap">
+          <label for="autoRefreshSelect">Live Poll:</label>
+          <select id="autoRefreshSelect" class="filter-select">
+            <option value="0" selected>Off</option>
+            <option value="5">Every 5s</option>
+            <option value="10">Every 10s</option>
+            <option value="30">Every 30s</option>
+          </select>
+        </div>
+
+        <!-- Refresh Button -->
+        <button id="btnViewerRefresh" class="btn-viewer-refresh" title="Reload records now">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+
+        <!-- Export CSV Button -->
+        <button id="btnExportCsv" class="btn-export-csv" title="Download current query as CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export CSV
+        </button>
+      </div>
+    </section>
+
+    <!-- 5. Data Grid Viewport -->
+    <section class="data-grid-container">
+      <div class="table-responsive-viewport">
+        <table class="scada-data-table" id="scadaDataTable">
+          <thead id="scadaTableHead">
+            <!-- Dynamically populated -->
+          </thead>
+          <tbody id="scadaTableBody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 6. Pagination Controls -->
+      <footer class="table-pagination-footer" id="tablePaginationFooter">
+        <div id="paginationInfoText">Showing 0 - 0 of 0 rows</div>
+        <div class="pagination-controls" id="paginationControls">
+          <!-- Dynamically populated -->
+        </div>
+      </footer>
+    </section>
+
+  </main>
+
+  <script src="/static/js/data_viewer.js"></script>
+</body>
+</html>
