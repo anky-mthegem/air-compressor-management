@@ -10,6 +10,7 @@ from app.database.models import CompressorTelemetry, CompressorEvent, Compressor
 from app.plc.collector import get_latest_telemetry
 from app.plc.simulator import simulator
 from app.oee.engine import oee_engine
+from app.utils.time_utils import get_current_time
 
 router = APIRouter(prefix="/api", tags=["Monitoring & OEE"])
 
@@ -23,6 +24,8 @@ def get_system_status():
         "app_name": settings.APP_NAME,
         "status": "ONLINE",
         "active_db": ACTIVE_DB_DIALECT,
+        "timezone": settings.TIMEZONE,
+        "timezone_label": settings.TIMEZONE_LABEL,
         "plc_mode": "PHYSICAL_S7_1200" if settings.PLC_ENABLED else "DIGITAL_TWIN_SIMULATOR",
         "plc_ip": settings.PLC_IP,
         "compressor": {
@@ -47,7 +50,7 @@ def get_live_telemetry():
 @router.get("/telemetry/history")
 def get_telemetry_history(minutes: int = Query(30, ge=5, le=1440), db: Session = Depends(get_db)):
     """Returns recent historical telemetry for line charts."""
-    cutoff = datetime.datetime.utcnow() - datetime.timedelta(minutes=minutes)
+    cutoff = get_current_time() - datetime.timedelta(minutes=minutes)
     records = db.query(CompressorTelemetry).filter(
         CompressorTelemetry.compressor_id == settings.COMPRESSOR_ID,
         CompressorTelemetry.timestamp >= cutoff

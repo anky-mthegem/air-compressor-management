@@ -79,6 +79,7 @@
 
   // DOM Elements
   const els = {
+    viewerTimezone: document.getElementById('viewerTimezone'),
     dbDialectBadge: document.getElementById('viewerDbDialect'),
     dbDot: document.getElementById('viewerDbDot'),
     totalRowsText: document.getElementById('viewerTotalRows'),
@@ -256,6 +257,9 @@
       if (!resp.ok) return;
       const data = await resp.json();
 
+      if (els.viewerTimezone && data.timezone_label) {
+        els.viewerTimezone.textContent = data.timezone_label;
+      }
       if (els.dbDialectBadge) {
         els.dbDialectBadge.textContent = data.active_db || 'SQLite';
       }

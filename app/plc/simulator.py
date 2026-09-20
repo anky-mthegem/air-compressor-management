@@ -5,6 +5,7 @@ import datetime
 import logging
 from typing import Dict, Any
 from app.config import settings
+from app.utils.time_utils import get_current_time
 
 logger = logging.getLogger("app.plc.simulator")
 
@@ -60,7 +61,7 @@ class CompressorSimulator:
 
     def tick(self, dt: float = 2.0) -> Dict[str, Any]:
         """Advance the simulation by dt seconds and return current sensor telemetry."""
-        now = datetime.datetime.utcnow()
+        now = get_current_time()
         self.cycle_timer += dt
 
         if self.fault:

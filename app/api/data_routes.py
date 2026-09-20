@@ -15,6 +15,7 @@ from app.database.models import (
     CompressorEvent,
     CompressorOEEHourly
 )
+from app.utils.time_utils import get_current_time
 
 router = APIRouter(prefix="/api/data", tags=["Database Viewer"])
 
@@ -65,6 +66,8 @@ def get_db_overview(db: Session = Depends(get_db)):
     return {
         "status": "ONLINE",
         "active_db": ACTIVE_DB_DIALECT,
+        "timezone": settings.TIMEZONE,
+        "timezone_label": settings.TIMEZONE_LABEL,
         "total_rows": total_rows,
         "tables": {
             "telemetry": {
@@ -139,7 +142,7 @@ def _build_filtered_query(
     time_col = TIMESTAMP_COL_MAP.get(key)
 
     # 1. Time range filtering
-    now = datetime.datetime.utcnow()
+    now = get_current_time()
     cutoff = None
     if time_filter == "1h":
         cutoff = now - datetime.timedelta(hours=1)
@@ -387,7 +390,7 @@ def export_table_csv(
         writer.writerow(row_vals)
 
     output.seek(0)
-    filename = f"compressor_{TABLE_NAMES[table]}_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"compressor_{TABLE_NAMES[table]}_{get_current_time().strftime('%Y%m%d_%H%M%S')}.csv"
 
     return StreamingResponse(
         iter([output.getvalue()]),

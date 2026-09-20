@@ -5,6 +5,7 @@ from app.database.models import (
     CompressorMaster, CompressorTelemetry, CompressorEvent, CompressorOEEHourly
 )
 from app.config import settings
+from app.utils.time_utils import get_current_time
 
 logger = logging.getLogger("app.seed")
 
@@ -29,7 +30,7 @@ def seed_initial_data_if_empty():
 
         # 2. Check if hourly OEE exists for past 24 hours
         oee_count = db.query(CompressorOEEHourly).filter(CompressorOEEHourly.compressor_id == settings.COMPRESSOR_ID).count()
-        now = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        now = get_current_time().replace(minute=0, second=0, microsecond=0)
 
         if oee_count < 12:
             logger.info("Generating realistic 24-hour historical OEE and telemetry data...")
@@ -86,7 +87,7 @@ def seed_initial_data_if_empty():
 
             # 3. Seed recent telemetry for initial strip chart (last 30 minutes, 1 min step)
             for m in range(30, 0, -1):
-                t_time = datetime.datetime.utcnow() - datetime.timedelta(minutes=m)
+                t_time = get_current_time() - datetime.timedelta(minutes=m)
                 is_loaded = (m % 5 != 0)
                 discharge_p = round(random.uniform(7.1, 7.4) if is_loaded else random.uniform(6.5, 6.8), 2)
                 header_p = round(discharge_p - random.uniform(0.2, 0.4), 2)
@@ -124,7 +125,7 @@ def seed_initial_data_if_empty():
             events = [
                 CompressorEvent(
                     compressor_id=settings.COMPRESSOR_ID,
-                    timestamp=datetime.datetime.utcnow() - datetime.timedelta(hours=8),
+                    timestamp=get_current_time() - datetime.timedelta(hours=8),
                     event_type="STATE_CHANGE",
                     severity="INFO",
                     description="Shift 1 Production Started. Compressor auto-loaded.",
@@ -133,7 +134,7 @@ def seed_initial_data_if_empty():
                 ),
                 CompressorEvent(
                     compressor_id=settings.COMPRESSOR_ID,
-                    timestamp=datetime.datetime.utcnow() - datetime.timedelta(hours=3, minutes=15),
+                    timestamp=get_current_time() - datetime.timedelta(hours=3, minutes=15),
                     event_type="WARNING",
                     severity="WARNING",
                     description="Air-Oil separator differential pressure reached 0.72 bar (approaching 0.80 bar service threshold).",
@@ -142,7 +143,7 @@ def seed_initial_data_if_empty():
                 ),
                 CompressorEvent(
                     compressor_id=settings.COMPRESSOR_ID,
-                    timestamp=datetime.datetime.utcnow() - datetime.timedelta(minutes=45),
+                    timestamp=get_current_time() - datetime.timedelta(minutes=45),
                     event_type="STATE_CHANGE",
                     severity="INFO",
                     description="Automatic condensate drain valve cycle completed.",

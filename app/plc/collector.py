@@ -8,6 +8,7 @@ from app.config import settings
 from app.plc.simulator import simulator
 from app.database.connection import SessionLocal
 from app.database.models import CompressorTelemetry, CompressorEvent
+from app.utils.time_utils import get_current_time
 
 logger = logging.getLogger("app.plc.collector")
 
@@ -159,7 +160,7 @@ class PLCDataCollector:
         try:
             event = CompressorEvent(
                 compressor_id=settings.COMPRESSOR_ID,
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=get_current_time(),
                 event_type="COMMUNICATION" if "PLC" in desc else "STATE_CHANGE",
                 severity=severity,
                 description=desc,

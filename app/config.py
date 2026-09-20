@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
 
+    # Timezone & Localization (Defaults to Indian Standard Time IST, synced with host device)
+    TIMEZONE: str = "Asia/Kolkata"
+    TIMEZONE_LABEL: str = "IST (UTC+05:30)"
+
     # Database Configuration (MSSQL + Auto SQLite Fallback)
     DB_TYPE: str = "mssql"  # "mssql" or "sqlite"
     MSSQL_SERVER: str = "localhost"

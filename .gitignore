@@ -15,8 +15,14 @@ ENV/
 # Local Database Files
 data/*.db
 data/*.sqlite3
+data/*.db-wal
+data/*.db-shm
+data/*.bak
 *.db
 *.sqlite3
+*.db-wal
+*.db-shm
+*.bak
 
 # IDE & Editor files
 .vscode/

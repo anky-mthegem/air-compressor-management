@@ -2,7 +2,7 @@ import os
 import urllib.parse
 import logging
 from pathlib import Path
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from app.database.models import Base
@@ -64,6 +64,17 @@ def create_db_engine():
     return sqlite_engine, "SQLite"
 
 engine, ACTIVE_DB_DIALECT = create_db_engine()
+
+# Configure SQLite WAL mode for high concurrency and low SD-card wear on Raspberry Pi
+if ACTIVE_DB_DIALECT == "SQLite":
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA cache_size=-64000")  # 64 MB in-memory query cache
+        cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():

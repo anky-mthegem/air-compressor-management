@@ -6,6 +6,7 @@ from sqlalchemy import func
 from app.config import settings
 from app.database.connection import SessionLocal
 from app.database.models import CompressorTelemetry, CompressorOEEHourly
+from app.utils.time_utils import get_current_time
 
 logger = logging.getLogger("app.oee.engine")
 
@@ -35,7 +36,7 @@ class OEEEngine:
         """
         db = SessionLocal()
         try:
-            start_time = datetime.datetime.utcnow() - datetime.timedelta(hours=hours)
+            start_time = get_current_time() - datetime.timedelta(hours=hours)
 
             # Query hourly aggregates first for historical stability
             hourly_records = db.query(CompressorOEEHourly).filter(

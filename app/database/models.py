@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column, Integer, Float, String, Boolean, DateTime, ForeignKey, Index, Text
 )
 from sqlalchemy.orm import declarative_base, relationship
+from app.utils.time_utils import get_current_time
 
 Base = declarative_base()
 
@@ -15,7 +16,7 @@ class CompressorMaster(Base):
     rated_power_kw = Column(Float, default=75.0)
     rated_flow_cfm = Column(Float, default=480.0)
     nominal_pressure_bar = Column(Float, default=7.0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=get_current_time)
 
     telemetry = relationship("CompressorTelemetry", back_populates="compressor", cascade="all, delete-orphan")
 
@@ -25,7 +26,7 @@ class CompressorTelemetry(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     compressor_id = Column(Integer, ForeignKey("compressor_master.id"), nullable=False, default=1)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=get_current_time, nullable=False, index=True)
 
     # Machine States
     motor_running = Column(Boolean, default=False)
@@ -74,7 +75,7 @@ class CompressorEvent(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     compressor_id = Column(Integer, nullable=False, default=1)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=get_current_time, nullable=False, index=True)
     event_type = Column(String(50), nullable=False)  # STATE_CHANGE, WARNING, TRIP, MAINTENANCE
     severity = Column(String(20), default="INFO")    # INFO, WARNING, CRITICAL
     description = Column(String(255), nullable=False)
